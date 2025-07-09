@@ -31,3 +31,19 @@ def load_or_create_config(config_file: str) -> tuple[str, list[str]]:
     )
     extensions = [ext.strip() for ext in extensions_str.split(",")]
     return directory, extensions
+
+
+def save_config(directory: str, extensions: list[str], config_file: str):
+    """Сохраняет конфигурацию в .ini файл."""
+    config = configparser.ConfigParser()
+    # Читаем существующий файл, чтобы не потерять другие секции, если они есть
+    config.read(config_file, encoding="utf-8")
+
+    if not config.has_section(CONFIG_SECTION):
+        config.add_section(CONFIG_SECTION)
+
+    config.set(CONFIG_SECTION, "directory", directory)
+    config.set(CONFIG_SECTION, "extensions", ", ".join(extensions))
+
+    with open(config_file, "w", encoding="utf-8") as f:
+        config.write(f)

@@ -149,7 +149,6 @@ class App(ctk.CTk):
 
     def refresh_file_list(self):
         """Сканирует директорию, обновляет список файлов и UI."""
-        self.error_label.configure(text="")  # Очищаем старые ошибки
         self.file_list = find_files(self.directory_to_scan, self.file_extensions)
 
         if not os.path.isdir(self.directory_to_scan):
@@ -165,7 +164,7 @@ class App(ctk.CTk):
 
     def open_random_file(self):
         """Выбирает и открывает случайный файл из списка."""
-        self.error_label.configure(text="")  # Очищаем сообщение об ошибке
+        self.error_label.configure(text="")  # Очищаем старые сообщения
         if not self.file_list:
             self.info_label.configure(
                 text="Файлы с указанными расширениями не найдены.",
@@ -229,9 +228,9 @@ class App(ctk.CTk):
 
         try:
             send2trash(file_to_delete)
-            self.info_label.configure(
+            self.error_label.configure(
                 text=f"Файл '{filename}' перемещен в корзину.",
-                text_color=self._success_text_color,
+                text_color=self._success_text_color,  # Используем зеленый цвет
             )
             self.last_selected_file = None
             self.refresh_file_list()

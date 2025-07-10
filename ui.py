@@ -7,7 +7,7 @@ from send2trash import send2trash
 
 # Импортируем наши новые модули
 from config import load_or_create_config, save_config, CONFIG_FILE
-from file_utils import find_files, open_file
+from file_utils import find_files, open_file, show_file_in_explorer
 
 
 class App(ctk.CTk):
@@ -17,7 +17,7 @@ class App(ctk.CTk):
         super().__init__()
 
         # --- 1. Настройка окна ---
-        self.title("Random File Opener v1.4")
+        self.title("Random File Opener v1.5")
         self.geometry("600x250")  # Высота окна для всех элементов
         # Настраиваем сетку: 3 колонки, третья (с полем ввода) растягивается
         self.grid_columnconfigure(0, weight=0)
@@ -74,14 +74,28 @@ class App(ctk.CTk):
             row=4, column=0, columnspan=3, padx=20, pady=(0, 10), sticky="ew"
         )
 
+        # --- Фрейм для кнопок действия ---
+        self.action_buttons_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.action_buttons_frame.grid(
+            row=2, column=0, columnspan=3, padx=20, pady=(10, 10)
+        )
+
         # Основная кнопка действия
         self.open_button = ctk.CTkButton(
-            self,
+            self.action_buttons_frame,  # Родитель - фрейм
             text="Открыть случайный файл",
             command=self.on_button_click,
         )
-        self.open_button.grid(row=2, column=0, columnspan=3, padx=20, pady=(10, 10))
+        self.open_button.grid(row=0, column=0, padx=(0, 5))
 
+        # Кнопка "Открыть папку"
+        self.open_folder_button = ctk.CTkButton(
+            self.action_buttons_frame,  # Родитель - фрейм
+            text="Открыть папку",
+            command=self.open_containing_folder,
+            state="disabled",  # Изначально неактивна
+        )
+        self.open_folder_button.grid(row=0, column=1, padx=(5, 0))
         # Кнопка удаления файла
         self.delete_button = ctk.CTkButton(
             self,
@@ -89,6 +103,7 @@ class App(ctk.CTk):
             command=self.delete_last_file,
             fg_color="firebrick",
             hover_color="darkred",
+            state="disabled",  # Изначально неактивна
         )
         self.delete_button.grid(row=3, column=0, columnspan=3, padx=20, pady=(0, 20))
 
@@ -141,6 +156,9 @@ class App(ctk.CTk):
         if set(new_extensions_with_dots) != set(self.file_extensions):
             self.file_extensions = new_extensions_with_dots
             save_config(self.directory_to_scan, self.file_extensions, CONFIG_FILE)
+            self.last_selected_file = None
+            self.delete_button.configure(state="disabled")
+            self.open_folder_button.configure(state="disabled")
             self.refresh_file_list()
 
         # 6. Убираем фокус с поля ввода после нажатия Enter для удобства
@@ -156,11 +174,17 @@ class App(ctk.CTk):
                 text=f"Ошибка: Папка не найдена!\n{self.directory_to_scan}",
                 text_color="red",
             )
+            self.open_button.configure(state="disabled")
         else:
             self.info_label.configure(
                 text=f"Найдено файлов: {len(self.file_list)}",
                 text_color=self._default_text_color,
             )
+            # Включаем или выключаем кнопку в зависимости от наличия файлов
+            if self.file_list:
+                self.open_button.configure(state="normal")
+            else:
+                self.open_button.configure(state="disabled")
 
     def open_random_file(self):
         """Выбирает и открывает случайный файл из списка."""
@@ -174,6 +198,8 @@ class App(ctk.CTk):
 
         random_file = random.choice(self.file_list)
         self.last_selected_file = random_file
+        self.delete_button.configure(state="normal")  # Активируем кнопку
+        self.open_folder_button.configure(state="normal")  # Активируем кнопку
         filename = os.path.basename(random_file)
         self.info_label.configure(
             text=f"Выбрано: {filename}", text_color=self._default_text_color
@@ -200,10 +226,38 @@ class App(ctk.CTk):
 
         if new_directory:  # Пользователь выбрал папку, а не нажал "Отмена"
             self.directory_to_scan = new_directory
+            self.last_selected_file = None
+            self.delete_button.configure(state="disabled")
+            self.open_folder_button.configure(state="disabled")
             # Сохраняем новую директорию в конфиг
             save_config(self.directory_to_scan, self.file_extensions, CONFIG_FILE)
             # Обновляем список файлов и UI
             self.refresh_file_list()
+
+    def open_containing_folder(self):
+        """Открывает папку с последним выбранным файлом."""
+        self.error_label.configure(text="")  # Очищаем старые сообщения
+        if not self.last_selected_file:
+            # Это состояние не должно быть достижимо, т.к. кнопка неактивна,
+            # но добавим проверку для надежности.
+            self.info_label.configure(
+                text="Сначала выберите файл.",
+                text_color=self._default_text_color,
+            )
+            return
+
+        try:
+            show_file_in_explorer(self.last_selected_file)
+        except (IOError, FileNotFoundError) as e:
+            # FileNotFoundError может возникнуть, если файл был удален вручную
+            error_message = f"Ошибка:\n{e}"
+            self.error_label.configure(text=error_message)
+            print(f"Не удалось показать файл {self.last_selected_file}: {e}")
+            # Если файл не найден, сбрасываем состояние
+            self.last_selected_file = None
+            self.delete_button.configure(state="disabled")
+            self.open_folder_button.configure(state="disabled")
+            self.refresh_file_list()  # Обновим счетчик, если файл пропал
 
     def delete_last_file(self):
         """Удаляет последний выбранный файл."""
@@ -224,6 +278,8 @@ class App(ctk.CTk):
                 text=f"Файл '{filename}' уже удален или перемещен.",
             )
             self.last_selected_file = None
+            self.delete_button.configure(state="disabled")
+            self.open_folder_button.configure(state="disabled")
             return
 
         try:
@@ -233,9 +289,13 @@ class App(ctk.CTk):
                 text_color=self._success_text_color,  # Используем зеленый цвет
             )
             self.last_selected_file = None
+            self.delete_button.configure(state="disabled")
+            self.open_folder_button.configure(state="disabled")
             self.refresh_file_list()
         except OSError as e:
             error_message = f"Ошибка удаления файла:\n{filename}"
             self.error_label.configure(text=error_message)
             self.last_selected_file = None
+            self.delete_button.configure(state="disabled")
+            self.open_folder_button.configure(state="disabled")
             print(f"Не удалось удалить файл {file_to_delete}: {e}")

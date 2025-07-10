@@ -39,3 +39,29 @@ def open_file(filepath: str):
         # Оборачиваем специфичные для платформы ошибки в общее исключение,
         # чтобы UI-слою не нужно было знать детали реализации.
         raise IOError(f"Не удалось запустить приложение для файла: {filepath}") from e
+
+
+def show_file_in_explorer(filepath: str):
+    """
+    Открывает файловый менеджер и показывает указанный файл.
+    Вызывает IOError при ошибке.
+    """
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f"Файл не найден: {filepath}")
+
+    try:
+        if sys.platform == "win32":
+            # /select,filepath - синтаксис для Проводника Windows.
+            # check=True здесь не используется, т.к. explorer.exe может возвращать
+            # ненулевой код завершения (например, 1) даже при успешном выполнении.
+            subprocess.run(["explorer", "/select,", filepath])
+        elif sys.platform == "darwin":  # macOS
+            # -R флаг для Finder
+            subprocess.run(["open", "-R", filepath], check=True)
+        else:  # linux variants
+            # Большинство файловых менеджеров откроют директорию.
+            # Выделение файла не является стандартизированной функцией.
+            directory = os.path.dirname(filepath)
+            subprocess.run(["xdg-open", directory], check=True)
+    except (OSError, subprocess.CalledProcessError) as e:
+        raise IOError(f"Не удалось открыть расположение файла: {filepath}") from e

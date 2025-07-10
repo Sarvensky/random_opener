@@ -238,4 +238,5 @@ class App(ctk.CTk):
         except OSError as e:
             error_message = f"Ошибка удаления файла:\n{filename}"
             self.error_label.configure(text=error_message)
+            self.last_selected_file = None
             print(f"Не удалось удалить файл {file_to_delete}: {e}")

@@ -1,38 +1,28 @@
 import customtkinter as ctk
 from customtkinter import filedialog
-import os
-import random
-import re
-from send2trash import send2trash
 
 # Импортируем наши новые модули
-from config import load_or_create_config, save_config, CONFIG_FILE
-from file_utils import find_files, open_file, show_file_in_explorer
+from app_logic import AppLogic
 
 
 class App(ctk.CTk):
-    """Основной класс приложения, который инкапсулирует всю логику и UI."""
+    """Основной класс приложения, который инкапсулирует UI."""
 
     def __init__(self):
         super().__init__()
 
         # --- 1. Настройка окна ---
-        self.title("Random File Opener v1.5")
+        self.title("Random File Opener v1.6")
         self.geometry("600x250")  # Высота окна для всех элементов
         # Настраиваем сетку: 3 колонки, третья (с полем ввода) растягивается
-        self.grid_columnconfigure(0, weight=0)
-        self.grid_columnconfigure(1, weight=0)
         self.grid_columnconfigure(2, weight=1)
 
-        # --- 2. Загрузка конфигурации и инициализация состояния ---
-        self.directory_to_scan, self.file_extensions = load_or_create_config(
-            CONFIG_FILE
-        )
-        self.file_list = []
-        self.last_selected_file = None
+        # --- 2. Инициализация логики и состояния UI ---
+        self.logic = AppLogic()
         # Сохраняем цвет текста по умолчанию для восстановления после ошибки
         self._default_text_color = ctk.ThemeManager.theme["CTkLabel"]["text_color"]
         self._success_text_color = "green"
+        self._error_text_color = "red"
 
         # --- 3. Создание виджетов ---
         # Кнопка выбора директории
@@ -51,7 +41,7 @@ class App(ctk.CTk):
         )
         # Заполняем поле текущими расширениями, убрав точки
         extensions_for_display = ", ".join(
-            [ext.lstrip(".") for ext in self.file_extensions]
+            [ext.lstrip(".") for ext in self.logic.file_extensions]
         )
         self.extensions_entry.insert(0, extensions_for_display)
         self.extensions_entry.grid(
@@ -69,7 +59,9 @@ class App(ctk.CTk):
         )
 
         # Метка для сообщений об ошибках и удалении
-        self.error_label = ctk.CTkLabel(self, text="", text_color="red")
+        self.error_label = ctk.CTkLabel(
+            self, text="", text_color=self._error_text_color
+        )
         self.error_label.grid(
             row=4, column=0, columnspan=3, padx=20, pady=(0, 10), sticky="ew"
         )
@@ -84,7 +76,7 @@ class App(ctk.CTk):
         self.open_button = ctk.CTkButton(
             self.action_buttons_frame,  # Родитель - фрейм
             text="Открыть случайный файл",
-            command=self.on_button_click,
+            command=self.open_random_file,
         )
         self.open_button.grid(row=0, column=0, padx=(0, 5))
 
@@ -107,8 +99,8 @@ class App(ctk.CTk):
         )
         self.delete_button.grid(row=3, column=0, columnspan=3, padx=20, pady=(0, 20))
 
-        # --- 4. Первоначальное сканирование файлов ---
-        self.refresh_file_list()
+        # --- 4. Первоначальное обновление UI ---
+        self.refresh_ui_from_logic()
 
         # --- 5. Дополнительные привязки событий ---
         # Привязываем событие клика к самому окну.
@@ -123,179 +115,109 @@ class App(ctk.CTk):
 
     def update_extensions_and_refresh(self, event=None):
         """
-        Обрабатывает, сохраняет и обновляет список расширений.
-        Вызывается по нажатию Enter или потере фокуса полем ввода.
+        Передает строку с расширениями в логику, обновляет UI по результату.
         """
         extensions_str = self.extensions_entry.get()
 
-        # 1. Разделяем строку по запятым или пробелам, используя регулярное выражение
-        raw_parts = re.split(r"[\s,]+", extensions_str)
+        # Передаем в слой логики
+        cleaned_display_str, message, status = self.logic.update_extensions(
+            extensions_str
+        )
 
-        # 2. Очищаем список:
-        #    - убираем лишние пробелы и точки в начале
-        #    - отфильтровываем пустые строки
-        #    - удаляем дубликаты, сохраняя порядок ввода
-        cleaned_extensions = []
-        for part in raw_parts:
-            # Убираем пробелы по краям и возможную точку от пользователя
-            clean_part = part.strip().lstrip(".")
-            if clean_part and clean_part not in cleaned_extensions:
-                cleaned_extensions.append(clean_part)
-
-        # 3. Обновляем поле ввода, чтобы пользователь видел "очищенный" результат
-        cleaned_display_str = ", ".join(cleaned_extensions)
+        # Обновляем поле ввода, чтобы пользователь видел "очищенный" результат
         # Проверяем, отличается ли текст, чтобы избежать лишних действий
         if self.extensions_entry.get() != cleaned_display_str:
             self.extensions_entry.delete(0, "end")
             self.extensions_entry.insert(0, cleaned_display_str)
 
-        # 4. Формируем итоговый список для использования в программе (с точками)
-        new_extensions_with_dots = [f".{ext}" for ext in cleaned_extensions]
+        # Если расширения изменились, логика вернет сообщение для отображения
+        if message:
+            self._update_info_label(message, status)
+            self._update_button_states()
 
-        # 5. Обновляем конфигурацию, только если список расширений действительно изменился
-        if set(new_extensions_with_dots) != set(self.file_extensions):
-            self.file_extensions = new_extensions_with_dots
-            save_config(self.directory_to_scan, self.file_extensions, CONFIG_FILE)
-            self.last_selected_file = None
-            self.delete_button.configure(state="disabled")
-            self.open_folder_button.configure(state="disabled")
-            self.refresh_file_list()
-
-        # 6. Убираем фокус с поля ввода после нажатия Enter для удобства
+        # Убираем фокус с поля ввода после нажатия Enter для удобства
         if event and hasattr(event, "keysym") and event.keysym == "Return":
             self.focus()
 
-    def refresh_file_list(self):
-        """Сканирует директорию, обновляет список файлов и UI."""
-        self.file_list = find_files(self.directory_to_scan, self.file_extensions)
+    def refresh_ui_from_logic(self):
+        """Обновляет все элементы UI на основе текущего состояния логики."""
+        message, status = self.logic.refresh_file_list()
+        self._update_info_label(message, status)
+        self._update_button_states()
 
-        if not os.path.isdir(self.directory_to_scan):
-            self.info_label.configure(
-                text=f"Ошибка: Папка не найдена!\n{self.directory_to_scan}",
-                text_color="red",
-            )
-            self.open_button.configure(state="disabled")
-        else:
-            self.info_label.configure(
-                text=f"Найдено файлов: {len(self.file_list)}",
-                text_color=self._default_text_color,
-            )
-            # Включаем или выключаем кнопку в зависимости от наличия файлов
-            if self.file_list:
-                self.open_button.configure(state="normal")
-            else:
-                self.open_button.configure(state="disabled")
+    def _update_info_label(self, text: str, status: str | None):
+        """Обновляет основную информационную метку."""
+        color = (
+            self._error_text_color if status == "error" else self._default_text_color
+        )
+        self.info_label.configure(text=text, text_color=color)
 
-    def open_random_file(self):
-        """Выбирает и открывает случайный файл из списка."""
-        self.error_label.configure(text="")  # Очищаем старые сообщения
-        if not self.file_list:
-            self.info_label.configure(
-                text="Файлы с указанными расширениями не найдены.",
-                text_color=self._default_text_color,
-            )
-            return
+    def _update_error_label(self, text: str, status: str):
+        """Обновляет метку для ошибок и сообщений об успехе."""
+        if status == "success":
+            color = self._success_text_color
+        elif status == "info":
+            color = self._default_text_color
+        else:  # error
+            color = self._error_text_color
+        self.error_label.configure(text=text, text_color=color)
 
-        random_file = random.choice(self.file_list)
-        self.last_selected_file = random_file
-        self.delete_button.configure(state="normal")  # Активируем кнопку
-        self.open_folder_button.configure(state="normal")  # Активируем кнопку
-        filename = os.path.basename(random_file)
-        self.info_label.configure(
-            text=f"Выбрано: {filename}", text_color=self._default_text_color
+    def _update_button_states(self):
+        """Обновляет состояние кнопок в зависимости от состояния логики."""
+        # Основная кнопка
+        self.open_button.configure(
+            state="normal" if self.logic.file_list else "disabled"
+        )
+        # Кнопки действий для последнего файла
+        self.open_folder_button.configure(
+            state="normal" if self.logic.last_selected_file else "disabled"
+        )
+        self.delete_button.configure(
+            state="normal" if self.logic.last_selected_file else "disabled"
         )
 
-        # Открываем файл с помощью утилитарной функции
-        try:
-            open_file(random_file)
-        except IOError as e:
-            # IOError - это исключение, которое мы определили в file_utils
-            error_message = f"Ошибка открытия файла:\n{os.path.basename(str(e))}"
-            self.error_label.configure(text=error_message)
-            print(f"Не удалось открыть файл {random_file}: {e}")
+    def open_random_file(self):
+        """Обработчик нажатия на кнопку 'Открыть случайный файл'."""
+        self._update_error_label("", "info")  # Очищаем старые сообщения
 
-    def on_button_click(self):
-        """Обработчик нажатия на основную кнопку."""
-        self.open_random_file()
+        file_path, message = self.logic.get_random_file()
+
+        self._update_info_label(message, "info")
+        self._update_button_states()
+
+        if file_path:
+            status = self.logic.open_last_file()
+            if status != "success":
+                self._update_error_label(status, "error")
 
     def select_directory(self):
-        """Открывает диалог выбора директории и обновляет конфигурацию."""
+        """Открывает диалог выбора директории и обновляет состояние."""
         new_directory = filedialog.askdirectory(
-            initialdir=self.directory_to_scan, title="Выберите папку для сканирования"
+            initialdir=self.logic.directory_to_scan,
+            title="Выберите папку для сканирования",
         )
 
         if new_directory:  # Пользователь выбрал папку, а не нажал "Отмена"
-            self.directory_to_scan = new_directory
-            self.last_selected_file = None
-            self.delete_button.configure(state="disabled")
-            self.open_folder_button.configure(state="disabled")
-            # Сохраняем новую директорию в конфиг
-            save_config(self.directory_to_scan, self.file_extensions, CONFIG_FILE)
-            # Обновляем список файлов и UI
-            self.refresh_file_list()
+            result = self.logic.select_new_directory(new_directory)
+            if result:
+                message, status = result
+                self._update_info_label(message, status)
+                self._update_button_states()
 
     def open_containing_folder(self):
         """Открывает папку с последним выбранным файлом."""
-        self.error_label.configure(text="")  # Очищаем старые сообщения
-        if not self.last_selected_file:
-            # Это состояние не должно быть достижимо, т.к. кнопка неактивна,
-            # но добавим проверку для надежности.
-            self.info_label.configure(
-                text="Сначала выберите файл.",
-                text_color=self._default_text_color,
-            )
-            return
-
-        try:
-            show_file_in_explorer(self.last_selected_file)
-        except (IOError, FileNotFoundError) as e:
-            # FileNotFoundError может возникнуть, если файл был удален вручную
-            error_message = f"Ошибка:\n{e}"
-            self.error_label.configure(text=error_message)
-            print(f"Не удалось показать файл {self.last_selected_file}: {e}")
-            # Если файл не найден, сбрасываем состояние
-            self.last_selected_file = None
-            self.delete_button.configure(state="disabled")
-            self.open_folder_button.configure(state="disabled")
-            self.refresh_file_list()  # Обновим счетчик, если файл пропал
+        self._update_error_label("", "info")  # Очищаем старые сообщения
+        status = self.logic.show_last_file_in_explorer()
+        if status != "success":
+            self._update_error_label(status, "error")
+            # Если файл не найден, логика сбросила last_selected_file.
+            # Обновим UI, чтобы отразить это (кнопки станут неактивными).
+            self.refresh_ui_from_logic()
 
     def delete_last_file(self):
         """Удаляет последний выбранный файл."""
-        self.error_label.configure(text="")  # Очищаем предыдущие ошибки
-        if not self.last_selected_file:
-            self.info_label.configure(
-                text="Еще ничего не выбиралось.",
-                text_color=self._default_text_color,
-            )
-            return
-
-        file_to_delete = self.last_selected_file
-        filename = os.path.basename(file_to_delete)
-
-        # Проверяем, существует ли файл перед удалением
-        if not os.path.exists(file_to_delete):
-            self.error_label.configure(
-                text=f"Файл '{filename}' уже удален или перемещен.",
-            )
-            self.last_selected_file = None
-            self.delete_button.configure(state="disabled")
-            self.open_folder_button.configure(state="disabled")
-            return
-
-        try:
-            send2trash(file_to_delete)
-            self.error_label.configure(
-                text=f"Файл '{filename}' перемещен в корзину.",
-                text_color=self._success_text_color,  # Используем зеленый цвет
-            )
-            self.last_selected_file = None
-            self.delete_button.configure(state="disabled")
-            self.open_folder_button.configure(state="disabled")
-            self.refresh_file_list()
-        except OSError as e:
-            error_message = f"Ошибка удаления файла:\n{filename}"
-            self.error_label.configure(text=error_message)
-            self.last_selected_file = None
-            self.delete_button.configure(state="disabled")
-            self.open_folder_button.configure(state="disabled")
-            print(f"Не удалось удалить файл {file_to_delete}: {e}")
+        message, status = self.logic.delete_last_file()
+        self._update_error_label(message, status)
+        # Состояние логики изменилось (файл удален, список обновлен),
+        # поэтому полностью обновляем UI.
+        self.refresh_ui_from_logic()

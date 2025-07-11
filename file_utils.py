@@ -1,25 +1,25 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 
 def find_files(directory: str, extensions: list[str]) -> list[str]:
     """Рекурсивно ищет файлы с заданными расширениями в указанной директории."""
-    if not os.path.isdir(directory):
+    p = Path(directory)
+    if not p.is_dir():
         # Возвращаем пустой список, если директория не существует.
         # Обработка ошибки будет в UI.
         return []
 
     found_files = []
+    for ext in extensions:
+        # rglob выполняет рекурсивный поиск. Паттерн должен быть вида '*.ext'.
+        pattern = f"*{ext}"
+        found_files.extend(p.rglob(pattern))
 
-    # Используем `_` для неиспользуемой переменной `dirs`
-    for root, _, files in os.walk(directory):
-        for file in files:
-            if any(file.endswith(ext) for ext in extensions):
-                full_path = os.path.normpath(os.path.join(root, file))
-                found_files.append(full_path)
-
-    return found_files
+    # Возвращаем список строк с абсолютными путями
+    return [str(f.resolve()) for f in found_files]
 
 
 def open_file(filepath: str):
@@ -46,7 +46,8 @@ def show_file_in_explorer(filepath: str):
     Открывает файловый менеджер и показывает указанный файл.
     Вызывает IOError при ошибке.
     """
-    if not os.path.isfile(filepath):
+    p = Path(filepath)
+    if not p.is_file():
         raise FileNotFoundError(f"Файл не найден: {filepath}")
 
     try:
@@ -54,14 +55,14 @@ def show_file_in_explorer(filepath: str):
             # /select,filepath - синтаксис для Проводника Windows.
             # check=True здесь не используется, т.к. explorer.exe может возвращать
             # ненулевой код завершения (например, 1) даже при успешном выполнении.
-            subprocess.run(["explorer", "/select,", filepath])
+            subprocess.run(["explorer", "/select,", str(p)])
         elif sys.platform == "darwin":  # macOS
             # -R флаг для Finder
-            subprocess.run(["open", "-R", filepath], check=True)
+            subprocess.run(["open", "-R", str(p)], check=True)
         else:  # linux variants
             # Большинство файловых менеджеров откроют директорию.
             # Выделение файла не является стандартизированной функцией.
-            directory = os.path.dirname(filepath)
+            directory = str(p.parent)
             subprocess.run(["xdg-open", directory], check=True)
     except (OSError, subprocess.CalledProcessError) as e:
         raise IOError(f"Не удалось открыть расположение файла: {filepath}") from e

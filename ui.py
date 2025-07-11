@@ -12,7 +12,7 @@ class App(ctk.CTk):
         super().__init__()
 
         # --- 1. Настройка окна ---
-        self.title("Random File Opener v1.6")
+        self.title("Random File Opener v1.7")
         self.geometry("600x250")  # Высота окна для всех элементов
         # Настраиваем сетку: 3 колонки, третья (с полем ввода) растягивается
         self.grid_columnconfigure(2, weight=1)
@@ -52,10 +52,25 @@ class App(ctk.CTk):
         # Привязываем тот же обработчик к потере фокуса
         self.extensions_entry.bind("<FocusOut>", self.update_extensions_and_refresh)
 
+        # --- Чек-бокс для рекурсивного поиска ---
+        self.recursive_checkbox = ctk.CTkCheckBox(
+            self,
+            text="Искать во вложенных папках",
+            command=self.toggle_recursive_search,
+        )
+        self.recursive_checkbox.grid(
+            row=1, column=0, columnspan=3, padx=20, pady=(5, 0), sticky="w"
+        )
+        # Устанавливаем начальное состояние чек-бокса из логики
+        if self.logic.recursive_scan:
+            self.recursive_checkbox.select()
+        else:
+            self.recursive_checkbox.deselect()
+
         # Информационная надпись для основных сообщений
         self.info_label = ctk.CTkLabel(self, text="Инициализация...")
         self.info_label.grid(
-            row=1, column=0, columnspan=3, padx=20, pady=10, sticky="ew"
+            row=2, column=0, columnspan=3, padx=20, pady=10, sticky="ew"
         )
 
         # Метка для сообщений об ошибках и удалении
@@ -63,13 +78,13 @@ class App(ctk.CTk):
             self, text="", text_color=self._error_text_color
         )
         self.error_label.grid(
-            row=4, column=0, columnspan=3, padx=20, pady=(0, 10), sticky="ew"
+            row=5, column=0, columnspan=3, padx=20, pady=(0, 10), sticky="ew"
         )
 
         # --- Фрейм для кнопок действия ---
         self.action_buttons_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.action_buttons_frame.grid(
-            row=2, column=0, columnspan=3, padx=20, pady=(10, 10)
+            row=3, column=0, columnspan=3, padx=20, pady=(10, 10)
         )
 
         # Основная кнопка действия
@@ -97,7 +112,7 @@ class App(ctk.CTk):
             hover_color="darkred",
             state="disabled",  # Изначально неактивна
         )
-        self.delete_button.grid(row=3, column=0, columnspan=3, padx=20, pady=(0, 20))
+        self.delete_button.grid(row=4, column=0, columnspan=3, padx=20, pady=(0, 20))
 
         # --- 4. Первоначальное обновление UI ---
         self.refresh_ui_from_logic()
@@ -112,6 +127,17 @@ class App(ctk.CTk):
         """Снимает фокус с активного виджета при клике на пустое место окна."""
         if event.widget == self:
             self.focus()
+
+    def toggle_recursive_search(self):
+        """
+        Обрабатывает изменение состояния чек-бокса рекурсивного поиска.
+        """
+        is_recursive = bool(self.recursive_checkbox.get())
+        result = self.logic.set_recursive_scan(is_recursive)
+        if result:
+            message, status = result
+            self._update_info_label(message, status)
+            self._update_button_states()
 
     def update_extensions_and_refresh(self, event=None):
         """

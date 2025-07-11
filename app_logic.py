@@ -16,9 +16,11 @@ class AppLogic:
     def __init__(self):
         """Инициализирует состояние приложения, загружая конфигурацию."""
         # Загружаем начальную конфигурацию
-        self.directory_to_scan, self.file_extensions = load_or_create_config(
-            CONFIG_FILE
-        )
+        (
+            self.directory_to_scan,
+            self.file_extensions,
+            self.recursive_scan,
+        ) = load_or_create_config(CONFIG_FILE)
         self.file_list = []
         self.last_selected_file: Path | None = None
 
@@ -38,7 +40,9 @@ class AppLogic:
                 "error",
             )
 
-        self.file_list = find_files(self.directory_to_scan, self.file_extensions)
+        self.file_list = find_files(
+            self.directory_to_scan, self.file_extensions, self.recursive_scan
+        )
         return f"Найдено файлов: {len(self.file_list)}", "info"
 
     def select_new_directory(self, new_directory: str) -> tuple[str, str] | None:
@@ -48,7 +52,12 @@ class AppLogic:
         if new_directory and new_directory != self.directory_to_scan:
             self.directory_to_scan = new_directory
             self.last_selected_file = None
-            save_config(self.directory_to_scan, self.file_extensions, CONFIG_FILE)
+            save_config(
+                self.directory_to_scan,
+                self.file_extensions,
+                self.recursive_scan,
+                CONFIG_FILE,
+            )
             return self.refresh_file_list()
         return None  # Нет изменений
 
@@ -73,13 +82,34 @@ class AppLogic:
 
         if set(new_extensions_with_dots) != set(self.file_extensions):
             self.file_extensions = new_extensions_with_dots
-            save_config(self.directory_to_scan, self.file_extensions, CONFIG_FILE)
+            save_config(
+                self.directory_to_scan,
+                self.file_extensions,
+                self.recursive_scan,
+                CONFIG_FILE,
+            )
             self.last_selected_file = None
             message, status = self.refresh_file_list()
             return cleaned_display_str, message, status
 
         # Возвращаем очищенную строку для консистентности UI, но без сообщения
         return cleaned_display_str, None, None
+
+    def set_recursive_scan(self, is_recursive: bool) -> tuple[str, str] | None:
+        """
+        Обновляет настройку рекурсивного сканирования и список файлов.
+        """
+        if is_recursive != self.recursive_scan:
+            self.recursive_scan = is_recursive
+            self.last_selected_file = None
+            save_config(
+                self.directory_to_scan,
+                self.file_extensions,
+                self.recursive_scan,
+                CONFIG_FILE,
+            )
+            return self.refresh_file_list()
+        return None
 
     def get_random_file(self) -> tuple[Path | None, str]:
         """

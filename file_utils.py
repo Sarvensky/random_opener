@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 
-def find_files(directory: str, extensions: list[str]) -> list[str]:
+def find_files(directory: str, extensions: list[str], recursive: bool) -> list[str]:
     """Рекурсивно ищет файлы с заданными расширениями в указанной директории."""
     p = Path(directory)
     if not p.is_dir():
@@ -12,11 +12,13 @@ def find_files(directory: str, extensions: list[str]) -> list[str]:
         # Обработка ошибки будет в UI.
         return []
 
+    glob_method = p.rglob if recursive else p.glob
+
     found_files = []
     for ext in extensions:
-        # rglob выполняет рекурсивный поиск. Паттерн должен быть вида '*.ext'.
+        # glob/rglob выполняет поиск. Паттерн должен быть вида '*.ext'.
         pattern = f"*{ext}"
-        found_files.extend(p.rglob(pattern))
+        found_files.extend(glob_method(pattern))
 
     # Возвращаем список строк с абсолютными путями
     return [str(f.resolve()) for f in found_files]

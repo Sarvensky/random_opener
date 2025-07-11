@@ -9,7 +9,7 @@ DEFAULT_EXTENSIONS = ".mp4, .mkv, .avi"
 DEFAULT_SCAN_PATH = str(Path.home() / "Videos")
 
 
-def load_or_create_config(config_file: str) -> tuple[str, list[str]]:
+def load_or_create_config(config_file: str) -> tuple[str, list[str], bool]:
     """Загружает конфигурацию из .ini файла или создает его с настройками по умолчанию."""
     config = configparser.ConfigParser()
     config_path = Path(config_file)
@@ -19,6 +19,7 @@ def load_or_create_config(config_file: str) -> tuple[str, list[str]]:
         config[CONFIG_SECTION] = {
             "directory": DEFAULT_SCAN_PATH,
             "extensions": DEFAULT_EXTENSIONS,
+            "recursive": "true",
         }
         with config_path.open("w", encoding="utf-8") as f:
             config.write(f)
@@ -29,11 +30,14 @@ def load_or_create_config(config_file: str) -> tuple[str, list[str]]:
     extensions_str = config.get(
         CONFIG_SECTION, "extensions", fallback=DEFAULT_EXTENSIONS
     )
+    recursive = config.getboolean(CONFIG_SECTION, "recursive", fallback=True)
     extensions = [ext.strip() for ext in extensions_str.split(",")]
-    return directory, extensions
+    return directory, extensions, recursive
 
 
-def save_config(directory: str, extensions: list[str], config_file: str):
+def save_config(
+    directory: str, extensions: list[str], recursive: bool, config_file: str
+):
     """Сохраняет конфигурацию в .ini файл."""
     config = configparser.ConfigParser()
     config_path = Path(config_file)
@@ -45,6 +49,7 @@ def save_config(directory: str, extensions: list[str], config_file: str):
 
     config.set(CONFIG_SECTION, "directory", directory)
     config.set(CONFIG_SECTION, "extensions", ", ".join(extensions))
+    config.set(CONFIG_SECTION, "recursive", str(recursive))
 
     with config_path.open("w", encoding="utf-8") as f:
         config.write(f)

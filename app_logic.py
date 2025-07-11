@@ -22,28 +22,55 @@ class AppLogic:
             self.recursive_scan,
         ) = load_or_create_config(CONFIG_FILE)
         self.file_list = []
+        self.subdirectories = []
+        self.selected_subdirectory: str | None = None  # None означает "Искать везде"
         self.last_selected_file: Path | None = None
 
         # Выполняем первоначальное сканирование
+        self.update_subdirectories()
         self.refresh_file_list()
+
+    def get_scan_path(self) -> Path:
+        """Определяет корневой путь для сканирования на основе выбранной подпапки."""
+        main_path = Path(self.directory_to_scan)
+        if self.selected_subdirectory:
+            return main_path / self.selected_subdirectory
+        return main_path
 
     def refresh_file_list(self) -> tuple[str, str]:
         """
         Сканирует указанную директорию на наличие файлов с заданными расширениями.
         Возвращает кортеж (сообщение, статус) для UI.
         """
-        scan_path = Path(self.directory_to_scan)
+        scan_path = self.get_scan_path()
         if not scan_path.is_dir():
             self.file_list = []
             return (
-                f"Ошибка: Папка не найдена!\n{self.directory_to_scan}",
+                f"Ошибка: Папка не найдена!\n{scan_path}",
                 "error",
             )
 
         self.file_list = find_files(
-            self.directory_to_scan, self.file_extensions, self.recursive_scan
+            str(scan_path), self.file_extensions, self.recursive_scan
         )
         return f"Найдено файлов: {len(self.file_list)}", "info"
+
+    def update_subdirectories(self) -> list[str]:
+        """Сканирует и обновляет список подпапок первого уровня."""
+        self.subdirectories = []
+        scan_path = Path(self.directory_to_scan)
+        if not scan_path.is_dir():
+            return []
+
+        try:
+            self.subdirectories = sorted(
+                [p.name for p in scan_path.iterdir() if p.is_dir()]
+            )
+        except OSError as e:
+            print(f"Ошибка сканирования подпапок в {scan_path}: {e}")
+            self.subdirectories = []
+
+        return self.subdirectories
 
     def select_new_directory(self, new_directory: str) -> tuple[str, str] | None:
         """
@@ -52,6 +79,8 @@ class AppLogic:
         if new_directory and new_directory != self.directory_to_scan:
             self.directory_to_scan = new_directory
             self.last_selected_file = None
+            self.selected_subdirectory = None  # Сбрасываем на "Искать везде"
+            self.update_subdirectories()  # Обновляем список подпапок
             save_config(
                 self.directory_to_scan,
                 self.file_extensions,
@@ -94,6 +123,17 @@ class AppLogic:
 
         # Возвращаем очищенную строку для консистентности UI, но без сообщения
         return cleaned_display_str, None, None
+
+    def set_selected_subdirectory(
+        self, subdir_name: str | None
+    ) -> tuple[str, str] | None:
+        """Обновляет выбранную подпапку и обновляет список файлов."""
+        if subdir_name != self.selected_subdirectory:
+            self.selected_subdirectory = subdir_name
+            self.last_selected_file = None
+            # Эта настройка не сохраняется в конфиг, это временный фильтр
+            return self.refresh_file_list()
+        return None
 
     def set_recursive_scan(self, is_recursive: bool) -> tuple[str, str] | None:
         """

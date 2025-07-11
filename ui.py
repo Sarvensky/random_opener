@@ -13,27 +13,9 @@ class App(ctk.CTk):
 
         # --- 1. Настройка окна ---
         self.title("Random File Opener v1.8")
-        self.geometry("600x300")  # Минимальная ширина окна
-
-        # --- Центральный фрейм для выравнивания ---
-        # Настраиваем сетку самого окна, чтобы она центрировала один единственный виджет - наш фрейм
-        self.grid_columnconfigure(
-            0, weight=1
-        )  # Пустая колонка слева, которая будет растягиваться
-        self.grid_columnconfigure(
-            1, weight=0
-        )  # Колонка для контента, не будет растягиваться
-        self.grid_columnconfigure(
-            2, weight=1
-        )  # Пустая колонка справа, которая будет растягиваться
-        self.grid_rowconfigure(
-            0, weight=1
-        )  # Пустая строка сверху, для вертикального центрирования
-        self.grid_rowconfigure(2, weight=1)  # Пустая строка снизу
-
-        # Создаем фрейм, в котором будут все наши виджеты
-        self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.content_frame.grid(row=1, column=1, sticky="")  # Размещаем фрейм по центру
+        self.geometry("600x300")  # Высота окна для всех элементов
+        # Настраиваем сетку: 3 колонки, третья (с полем ввода)
+        self.grid_columnconfigure(2, weight=1)  # растягивать
 
         # --- 2. Инициализация логики и состояния UI ---
         self.logic = AppLogic()
@@ -43,21 +25,19 @@ class App(ctk.CTk):
         self._error_text_color = "red"
 
         # --- 3. Создание виджетов ---
-        # Все виджеты теперь добавляются в content_frame, а не в self
         # Кнопка выбора директории
         self.select_dir_button = ctk.CTkButton(
-            self.content_frame, text="Выбор папки", command=self.select_directory
+            self, text="Выбор папки", command=self.select_directory
         )
         self.select_dir_button.grid(row=0, column=0, padx=(20, 10), pady=(20, 10))
 
         # Надпись "Расширения" для наглядности
-        self.extensions_label = ctk.CTkLabel(self.content_frame, text="Расширения:")
+        self.extensions_label = ctk.CTkLabel(self, text="Расширения:")
         self.extensions_label.grid(row=0, column=1, padx=0, pady=(20, 10), sticky="w")
 
         # Поле для редактирования расширений
         self.extensions_entry = ctk.CTkEntry(
-            self.content_frame,
-            placeholder_text="Расширения через запятую (напр. mp4, mkv)",
+            self, placeholder_text="Расширения через запятую (напр. mp4, mkv)"
         )
         # Заполняем поле текущими расширениями, убрав точки
         extensions_for_display = ", ".join(
@@ -74,7 +54,7 @@ class App(ctk.CTk):
 
         # --- Чек-бокс для рекурсивного поиска ---
         self.recursive_checkbox = ctk.CTkCheckBox(
-            self.content_frame,
+            self,
             text="Искать во вложенных папках",
             command=self.toggle_recursive_search,
         )
@@ -89,7 +69,7 @@ class App(ctk.CTk):
 
         # --- Выпадающий список подпапок ---
         self.subdir_combobox = ctk.CTkComboBox(
-            self.content_frame,
+            self,
             values=["Искать везде"],
             command=self.on_subdirectory_selected,
             state="readonly",  # Чтобы пользователь не мог вводить свой текст
@@ -99,15 +79,13 @@ class App(ctk.CTk):
         )
 
         # Информационная строка для основных сообщений
-        self.info_label = ctk.CTkLabel(self.content_frame, text="Инициализация...")
+        self.info_label = ctk.CTkLabel(self, text="Инициализация...")
         self.info_label.grid(
             row=3, column=0, columnspan=3, padx=20, pady=10, sticky="ew"
         )
 
         # --- Фрейм для кнопок действия ---
-        self.action_buttons_frame = ctk.CTkFrame(
-            self.content_frame, fg_color="transparent"
-        )
+        self.action_buttons_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.action_buttons_frame.grid(
             row=4, column=0, columnspan=3, padx=20, pady=(0, 10)
         )
@@ -131,7 +109,7 @@ class App(ctk.CTk):
 
         # Кнопка удаления файла
         self.delete_button = ctk.CTkButton(
-            self.content_frame,
+            self,
             text="Удалить последний файл",
             command=self.delete_last_file,
             fg_color="firebrick",
@@ -142,7 +120,7 @@ class App(ctk.CTk):
 
         # Метка для сообщений об ошибках и удалении
         self.error_label = ctk.CTkLabel(
-            self.content_frame, text="", text_color=self._error_text_color
+            self, text="", text_color=self._error_text_color
         )
         self.error_label.grid(
             row=6, column=0, columnspan=3, padx=20, pady=(0, 10), sticky="ew"

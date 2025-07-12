@@ -13,7 +13,7 @@ class App(ctk.CTk):
 
         # --- 1. Настройка окна ---
         self.title("Random File Opener v1.8")
-        self.geometry("600x300")  # Высота окна для всех элементов
+        self.geometry("600x350")  # Высота окна для всех элементов
         # Настраиваем сетку: 3 колонки, третья (с полем ввода)
         self.grid_columnconfigure(2, weight=1)  # растягивать
 
@@ -52,15 +52,31 @@ class App(ctk.CTk):
         # Привязываем тот же обработчик к потере фокуса
         self.extensions_entry.bind("<FocusOut>", self.update_extensions_and_refresh)
 
-        # --- Чек-бокс для рекурсивного поиска ---
+        # --- Фрейм для чек-боксов ---
+        self.checkbox_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.checkbox_frame.grid(
+            row=1, column=0, columnspan=3, padx=15, pady=(5, 10), sticky="w"
+        )
+
+        # --- Чек-бокс для отображения папок ---
+        self.toplevel_dirs_checkbox = ctk.CTkCheckBox(
+            self.checkbox_frame,
+            text="Папки только первого уровня",
+            command=self.toggle_toplevel_dirs_only,
+        )
+        self.toplevel_dirs_checkbox.pack(side="left", padx=(5, 10))
+        if self.logic.toplevel_dirs_only:
+            self.toplevel_dirs_checkbox.select()
+        else:
+            self.toplevel_dirs_checkbox.deselect()
+
+        # --- Чек-бокс для рекурсивного поиска файлов ---
         self.recursive_checkbox = ctk.CTkCheckBox(
-            self,
+            self.checkbox_frame,
             text="Искать во вложенных папках",
             command=self.toggle_recursive_search,
         )
-        self.recursive_checkbox.grid(
-            row=1, column=0, columnspan=3, padx=20, pady=(5, 10), sticky="w"
-        )
+        self.recursive_checkbox.pack(side="left", padx=(10, 5))
         # Устанавливаем начальное состояние чек-бокса из логики
         if self.logic.recursive_scan:
             self.recursive_checkbox.select()
@@ -140,6 +156,16 @@ class App(ctk.CTk):
         """Снимает фокус с активного виджета при клике на пустое место окна."""
         if event.widget == self:
             self.focus()
+
+    def toggle_toplevel_dirs_only(self):
+        """Обрабатывает изменение состояния чек-бокса отображения подпапок."""
+        is_toplevel_only = bool(self.toplevel_dirs_checkbox.get())
+        if self.logic.set_toplevel_dirs_only(is_toplevel_only):
+            # Логика изменила состояние, нужно обновить выпадающий список
+            self._update_subdirectory_dropdown()
+            # После смены режима отображения папок, выбор сбрасывается,
+            # поэтому обновляем и список файлов для "Искать везде".
+            self.refresh_ui_from_logic()
 
     def _update_subdirectory_dropdown(self):
         """Обновляет выпадающий список подпапками из слоя логики."""

@@ -20,6 +20,7 @@ class AppLogic:
             self.directory_to_scan,
             self.file_extensions,
             self.recursive_scan,
+            self.toplevel_dirs_only,
         ) = load_or_create_config(CONFIG_FILE)
         self.file_list = []
         self.subdirectories = []
@@ -63,9 +64,23 @@ class AppLogic:
             return []
 
         try:
-            self.subdirectories = sorted(
-                [p.name for p in scan_path.iterdir() if p.is_dir()]
-            )
+            if self.toplevel_dirs_only:
+                # Только папки первого уровня
+                self.subdirectories = sorted(
+                    [p.name for p in scan_path.iterdir() if p.is_dir()]
+                )
+            else:
+                # Все вложенные папки
+                all_dirs = []
+                # Используем rglob для рекурсивного поиска всех папок
+                for p in scan_path.rglob("*"):
+                    if p.is_dir():
+                        # Получаем относительный путь от scan_path
+                        relative_path_str = str(p.relative_to(scan_path))
+                        # Исключаем саму корневую папку (которая будет ".")
+                        if relative_path_str != ".":
+                            all_dirs.append(relative_path_str)
+                self.subdirectories = sorted(all_dirs)
         except OSError as e:
             print(f"Ошибка сканирования подпапок в {scan_path}: {e}")
             self.subdirectories = []
@@ -85,6 +100,7 @@ class AppLogic:
                 self.directory_to_scan,
                 self.file_extensions,
                 self.recursive_scan,
+                self.toplevel_dirs_only,
                 CONFIG_FILE,
             )
             return self.refresh_file_list()
@@ -115,6 +131,7 @@ class AppLogic:
                 self.directory_to_scan,
                 self.file_extensions,
                 self.recursive_scan,
+                self.toplevel_dirs_only,
                 CONFIG_FILE,
             )
             self.last_selected_file = None
@@ -123,6 +140,22 @@ class AppLogic:
 
         # Возвращаем очищенную строку для консистентности UI, но без сообщения
         return cleaned_display_str, None, None
+
+    def set_toplevel_dirs_only(self, is_toplevel_only: bool) -> bool:
+        """Обновляет настройку отображения подпапок и их список."""
+        if is_toplevel_only != self.toplevel_dirs_only:
+            self.toplevel_dirs_only = is_toplevel_only
+            self.selected_subdirectory = None  # Сбрасываем выбор
+            save_config(
+                self.directory_to_scan,
+                self.file_extensions,
+                self.recursive_scan,
+                self.toplevel_dirs_only,
+                CONFIG_FILE,
+            )
+            self.update_subdirectories()
+            return True  # Изменение было
+        return False  # Изменений не было
 
     def set_selected_subdirectory(
         self, subdir_name: str | None
@@ -146,6 +179,7 @@ class AppLogic:
                 self.directory_to_scan,
                 self.file_extensions,
                 self.recursive_scan,
+                self.toplevel_dirs_only,
                 CONFIG_FILE,
             )
             return self.refresh_file_list()

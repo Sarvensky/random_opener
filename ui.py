@@ -12,8 +12,21 @@ class App(ctk.CTk):
         super().__init__()
 
         # --- 1. Настройка окна ---
-        self.title("Random File Opener v1.8")
-        self.geometry("600x350")  # Высота окна для всех элементов
+        self.title("Random File Opener")
+
+        # Задаем размеры окна и центрируем его на экране
+        window_width = 600
+        # Высота 300px, чтобы комфортно разместить все элементы, включая чек-боксы
+        window_height = 300
+
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+
+        center_x = int(screen_width / 2 - window_width / 2)
+        center_y = int(screen_height / 2 - window_height / 2)
+
+        self.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
+
         # Настраиваем сетку: 3 колонки, третья (с полем ввода)
         self.grid_columnconfigure(2, weight=1)  # растягивать
 

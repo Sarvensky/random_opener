@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from customtkinter import filedialog
+from pathlib import Path
 
 # Импортируем наши новые модули
 from app_logic import AppLogic
@@ -13,6 +14,17 @@ class App(ctk.CTk):
 
         # --- 1. Настройка окна ---
         self.title("Random File Opener")
+
+        # Установка иконки окна
+        try:
+            # Путь к иконке относительно текущего файла ui.py
+            icon_path = Path(__file__).parent / "img" / "main_icon.ico"
+            if icon_path.is_file():
+                self.iconbitmap(str(icon_path))
+        except Exception as e:
+            # Если иконка не найдена или произошла ошибка, просто выводим сообщение в консоль
+            # и продолжаем работу приложения без иконки.
+            print(f"Не удалось загрузить иконку: {e}")
 
         # Задаем размеры окна и центрируем его на экране
         window_width = 600

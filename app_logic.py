@@ -1,5 +1,6 @@
 import random
 import re
+import os
 from pathlib import Path
 from send2trash import send2trash
 
@@ -72,14 +73,17 @@ class AppLogic:
             else:
                 # Все вложенные папки
                 all_dirs = []
-                # Используем rglob для рекурсивного поиска всех папок
-                for p in scan_path.rglob("*"):
-                    if p.is_dir():
-                        # Получаем относительный путь от scan_path
-                        relative_path_str = str(p.relative_to(scan_path))
-                        # Исключаем саму корневую папку (которая будет ".")
-                        if relative_path_str != ".":
-                            all_dirs.append(relative_path_str)
+                # Используем os.walk для рекурсивного и эффективного поиска всех папок,
+                # так как он не итерируется по файлам, в отличие от rglob('*').
+                for root, dirs, _ in os.walk(scan_path):
+                    for d in dirs:
+                        # Составляем полный путь к подпапке
+                        full_path = Path(root) / d
+                        # Получаем относительный путь от scan_path и нормализуем разделители
+                        relative_path_str = str(
+                            full_path.relative_to(scan_path)
+                        ).replace("\\", "/")
+                        all_dirs.append(relative_path_str)
                 self.subdirectories = sorted(all_dirs)
         except OSError as e:
             print(f"Ошибка сканирования подпапок в {scan_path}: {e}")

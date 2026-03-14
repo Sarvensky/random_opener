@@ -4,8 +4,28 @@ import sys
 from pathlib import Path
 
 
-def find_files(directory: str, extensions: list[str], recursive: bool) -> list[str]:
-    """Рекурсивно ищет файлы с заданными расширениями в указанной директории."""
+def find_files(
+    directory: str, 
+    extensions: list[str], 
+    recursive: bool,
+    prefixes: list[str] | None = None,
+    postfixes: list[str] | None = None,
+    not_prefix: bool = False,
+    not_postfix: bool = False,
+) -> list[str]:
+    """
+    Рекурсивно ищет файлы с заданными расширениями в указанной директории.
+    Применяет фильтрацию по префиксам и постфиксам имени файла (без расширения).
+    
+    Args:
+        directory: Путь к директории для поиска
+        extensions: Список расширений для поиска (например, ['.mp4', '.mkv'])
+        recursive: Рекурсивный поиск во вложенных директориях
+        prefixes: Список префиксов для фильтрации имён файлов
+        postfixes: Список постфиксов для фильтрации имён файлов
+        not_prefix: Если True, исключать файлы с указанными префиксами
+        not_postfix: Если True, исключать файлы с указанными постфиксами
+    """
     p = Path(directory)
     if not p.is_dir():
         # Возвращаем пустой список, если директория не существует.
@@ -20,8 +40,44 @@ def find_files(directory: str, extensions: list[str], recursive: bool) -> list[s
         pattern = f"*{ext}"
         found_files.extend(glob_method(pattern))
 
+    # Применяем фильтрацию по префиксам и постфиксам
+    filtered_files = []
+    for file_path in found_files:
+        # Получаем имя файла без расширения
+        file_name_without_ext = file_path.stem
+        
+        # Проверяем префиксы
+        prefix_match = False
+        if prefixes:
+            prefix_match = any(
+                file_name_without_ext.startswith(prefix) 
+                for prefix in prefixes
+            )
+        else:
+            prefix_match = True  # Если префиксы не заданы, считаем что совпадает
+        
+        # Проверяем постфиксы
+        postfix_match = False
+        if postfixes:
+            postfix_match = any(
+                file_name_without_ext.endswith(postfix) 
+                for postfix in postfixes
+            )
+        else:
+            postfix_match = True  # Если постфиксы не заданы, считаем что совпадает
+        
+        # Применяем инверсию если нужно
+        if not_prefix:
+            prefix_match = not prefix_match
+        if not_postfix:
+            postfix_match = not postfix_match
+        
+        # Файл подходит если совпадает и по префиксу и по постфиксу
+        if prefix_match and postfix_match:
+            filtered_files.append(file_path)
+
     # Возвращаем список строк с абсолютными путями
-    return [str(f.resolve()) for f in found_files]
+    return [str(f.resolve()) for f in filtered_files]
 
 
 def open_file(filepath: str):

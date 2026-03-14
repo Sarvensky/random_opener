@@ -28,8 +28,8 @@ class App(ctk.CTk):
 
         # Задаем размеры окна и центрируем его на экране
         window_width = 600
-        # Высота 300px, чтобы комфортно разместить все элементы, включая чек-боксы
-        window_height = 300
+        # Высота 340px с учётом компактного размещения фильтров
+        window_height = 340
 
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -77,10 +77,75 @@ class App(ctk.CTk):
         # Привязываем тот же обработчик к потере фокуса
         self.extensions_entry.bind("<FocusOut>", self.update_extensions_and_refresh)
 
+        # --- Строка с фильтрами по префиксу/постфиксу ---
+        # Фрейм для фильтров на одной строке
+        self.filter_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.filter_frame.grid(
+            row=1, column=0, columnspan=3, padx=15, pady=(5, 10), sticky="ew"
+        )
+        # Растягиваем среднюю колонку
+        self.filter_frame.grid_columnconfigure(1, weight=1)
+
+        # --- Левая часть: Префикс ---
+        self.prefix_frame = ctk.CTkFrame(self.filter_frame, fg_color="transparent")
+        self.prefix_frame.grid(row=0, column=0, sticky="w")
+
+        # Чек-бокс "НЕ" для префикса
+        self.not_prefix_checkbox = ctk.CTkCheckBox(
+            self.prefix_frame, text="НЕ", command=self.toggle_not_prefix, width=40
+        )
+        self.not_prefix_checkbox.pack(side="left", padx=(0, 5))
+        if self.logic.not_prefix:
+            self.not_prefix_checkbox.select()
+        else:
+            self.not_prefix_checkbox.deselect()
+
+        # Метка "Префикс:"
+        self.prefix_label = ctk.CTkLabel(self.prefix_frame, text="Префикс:")
+        self.prefix_label.pack(side="left", padx=(0, 5))
+
+        # Поле для префиксов
+        self.prefix_entry = ctk.CTkEntry(
+            self.prefix_frame, placeholder_text="напр., _edit, temp", width=150
+        )
+        prefixes_for_display = ", ".join(self.logic.prefixes)
+        self.prefix_entry.insert(0, prefixes_for_display)
+        self.prefix_entry.pack(side="left", padx=(0, 10))
+        self.prefix_entry.bind("<Return>", self.update_prefixes_and_refresh)
+        self.prefix_entry.bind("<FocusOut>", self.update_prefixes_and_refresh)
+
+        # --- Правая часть: Постфикс ---
+        self.postfix_frame = ctk.CTkFrame(self.filter_frame, fg_color="transparent")
+        self.postfix_frame.grid(row=0, column=1, sticky="e")
+
+        # Чек-бокс "НЕ" для постфикса
+        self.not_postfix_checkbox = ctk.CTkCheckBox(
+            self.postfix_frame, text="НЕ", command=self.toggle_not_postfix, width=40
+        )
+        self.not_postfix_checkbox.pack(side="left", padx=(0, 5))
+        if self.logic.not_postfix:
+            self.not_postfix_checkbox.select()
+        else:
+            self.not_postfix_checkbox.deselect()
+
+        # Метка "Постфикс:"
+        self.postfix_label = ctk.CTkLabel(self.postfix_frame, text="Постфикс:")
+        self.postfix_label.pack(side="left", padx=(0, 5))
+
+        # Поле для постфиксов
+        self.postfix_entry = ctk.CTkEntry(
+            self.postfix_frame, placeholder_text="напр., _final, _v2", width=150
+        )
+        postfixes_for_display = ", ".join(self.logic.postfixes)
+        self.postfix_entry.insert(0, postfixes_for_display)
+        self.postfix_entry.pack(side="left", padx=(0, 10))
+        self.postfix_entry.bind("<Return>", self.update_postfixes_and_refresh)
+        self.postfix_entry.bind("<FocusOut>", self.update_postfixes_and_refresh)
+
         # --- Фрейм для чек-боксов ---
         self.checkbox_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.checkbox_frame.grid(
-            row=1, column=0, columnspan=3, padx=15, pady=(5, 10), sticky="w"
+            row=2, column=0, columnspan=3, padx=15, pady=(5, 10), sticky="w"
         )
 
         # --- Чек-бокс для отображения папок ---
@@ -116,19 +181,19 @@ class App(ctk.CTk):
             state="readonly",  # Чтобы пользователь не мог вводить свой текст
         )
         self.subdir_combobox.grid(
-            row=2, column=0, columnspan=3, padx=20, pady=(5, 0), sticky="ew"
+            row=3, column=0, columnspan=3, padx=20, pady=(5, 0), sticky="ew"
         )
 
         # Информационная строка для основных сообщений
         self.info_label = ctk.CTkLabel(self, text="Инициализация...")
         self.info_label.grid(
-            row=3, column=0, columnspan=3, padx=20, pady=10, sticky="ew"
+            row=4, column=0, columnspan=3, padx=20, pady=10, sticky="ew"
         )
 
         # --- Фрейм для кнопок действия ---
         self.action_buttons_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.action_buttons_frame.grid(
-            row=4, column=0, columnspan=3, padx=20, pady=(0, 10)
+            row=5, column=0, columnspan=3, padx=20, pady=(0, 10)
         )
 
         # ОКнопка открытия файла
@@ -157,14 +222,14 @@ class App(ctk.CTk):
             hover_color="darkred",
             state="disabled",  # Изначально неактивна
         )
-        self.delete_button.grid(row=5, column=0, columnspan=3, padx=20, pady=(0, 20))
+        self.delete_button.grid(row=6, column=0, columnspan=3, padx=20, pady=(0, 20))
 
         # Метка для сообщений об ошибках и удалении
         self.error_label = ctk.CTkLabel(
             self, text="", text_color=self._error_text_color
         )
         self.error_label.grid(
-            row=6, column=0, columnspan=3, padx=20, pady=(0, 10), sticky="ew"
+            row=7, column=0, columnspan=3, padx=20, pady=(0, 10), sticky="ew"
         )
 
         # --- 4. Первоначальное обновление UI ---
@@ -249,6 +314,70 @@ class App(ctk.CTk):
         # Убираем фокус с поля ввода после нажатия Enter для удобства
         if event and hasattr(event, "keysym") and event.keysym == "Return":
             self.focus()
+
+    def update_prefixes_and_refresh(self, event=None):
+        """
+        Передает строку с префиксами в логику, обновляет UI по результату.
+        """
+        prefixes_str = self.prefix_entry.get()
+
+        # Передаем в слой логики
+        cleaned_display_str, message, status = self.logic.update_prefixes(
+            prefixes_str
+        )
+
+        # Обновляем поле ввода, чтобы пользователь видел "очищенный" результат
+        if self.prefix_entry.get() != cleaned_display_str:
+            self.prefix_entry.delete(0, "end")
+            self.prefix_entry.insert(0, cleaned_display_str)
+
+        if message:
+            self._update_info_label(message, status)
+            self._update_button_states()
+
+        if event and hasattr(event, "keysym") and event.keysym == "Return":
+            self.focus()
+
+    def update_postfixes_and_refresh(self, event=None):
+        """
+        Передает строку с постфиксами в логику, обновляет UI по результату.
+        """
+        postfixes_str = self.postfix_entry.get()
+
+        # Передаем в слой логики
+        cleaned_display_str, message, status = self.logic.update_postfixes(
+            postfixes_str
+        )
+
+        # Обновляем поле ввода, чтобы пользователь видел "очищенный" результат
+        if self.postfix_entry.get() != cleaned_display_str:
+            self.postfix_entry.delete(0, "end")
+            self.postfix_entry.insert(0, cleaned_display_str)
+
+        if message:
+            self._update_info_label(message, status)
+            self._update_button_states()
+
+        if event and hasattr(event, "keysym") and event.keysym == "Return":
+            self.focus()
+
+    def toggle_not_prefix(self):
+        """Обрабатывает изменение состояния чек-бокса НЕ для префикса."""
+        is_not_prefix = bool(self.not_prefix_checkbox.get())
+        result = self.logic.set_not_prefix(is_not_prefix)
+        if result:
+            message, status = result
+            self._update_info_label(message, status)
+            self._update_button_states()
+
+    def toggle_not_postfix(self):
+        """Обрабатывает изменение состояния чек-бокса НЕ для постфикса."""
+        is_not_postfix = bool(self.not_postfix_checkbox.get())
+        result = self.logic.set_not_postfix(is_not_postfix)
+        if result:
+            message, status = result
+            self._update_info_label(message, status)
+            self._update_button_states()
 
     def refresh_ui_from_logic(self):
         """Обновляет все элементы UI на основе текущего состояния логики."""

@@ -22,6 +22,10 @@ class AppLogic:
             self.file_extensions,
             self.recursive_scan,
             self.toplevel_dirs_only,
+            self.prefixes,
+            self.postfixes,
+            self.not_prefix,
+            self.not_postfix,
         ) = load_or_create_config(CONFIG_FILE)
         self.file_list = []
         self.subdirectories = []
@@ -53,7 +57,13 @@ class AppLogic:
             )
 
         self.file_list = find_files(
-            str(scan_path), self.file_extensions, self.recursive_scan
+            str(scan_path), 
+            self.file_extensions, 
+            self.recursive_scan,
+            self.prefixes,
+            self.postfixes,
+            self.not_prefix,
+            self.not_postfix,
         )
         return f"Найдено файлов: {len(self.file_list)}", "info"
 
@@ -105,6 +115,10 @@ class AppLogic:
                 self.file_extensions,
                 self.recursive_scan,
                 self.toplevel_dirs_only,
+                self.prefixes,
+                self.postfixes,
+                self.not_prefix,
+                self.not_postfix,
                 CONFIG_FILE,
             )
             return self.refresh_file_list()
@@ -136,6 +150,10 @@ class AppLogic:
                 self.file_extensions,
                 self.recursive_scan,
                 self.toplevel_dirs_only,
+                self.prefixes,
+                self.postfixes,
+                self.not_prefix,
+                self.not_postfix,
                 CONFIG_FILE,
             )
             self.last_selected_file = None
@@ -155,6 +173,10 @@ class AppLogic:
                 self.file_extensions,
                 self.recursive_scan,
                 self.toplevel_dirs_only,
+                self.prefixes,
+                self.postfixes,
+                self.not_prefix,
+                self.not_postfix,
                 CONFIG_FILE,
             )
             self.update_subdirectories()
@@ -184,6 +206,104 @@ class AppLogic:
                 self.file_extensions,
                 self.recursive_scan,
                 self.toplevel_dirs_only,
+                self.prefixes,
+                self.postfixes,
+                self.not_prefix,
+                self.not_postfix,
+                CONFIG_FILE,
+            )
+            return self.refresh_file_list()
+        return None
+
+    def update_prefixes(self, prefixes_str: str) -> tuple[str, str | None, str | None]:
+        """
+        Обрабатывает строку с префиксами, обновляет конфигурацию и список файлов.
+        Возвращает (очищенная_строка, сообщение_для_ui, статус).
+        """
+        raw_parts = re.split(r"[\s,]+", prefixes_str)
+        cleaned_prefixes = [p.strip() for p in raw_parts if p.strip()]
+        cleaned_display_str = ", ".join(cleaned_prefixes)
+
+        if set(cleaned_prefixes) != set(self.prefixes):
+            self.prefixes = cleaned_prefixes
+            save_config(
+                self.directory_to_scan,
+                self.file_extensions,
+                self.recursive_scan,
+                self.toplevel_dirs_only,
+                self.prefixes,
+                self.postfixes,
+                self.not_prefix,
+                self.not_postfix,
+                CONFIG_FILE,
+            )
+            self.last_selected_file = None
+            message, status = self.refresh_file_list()
+            return cleaned_display_str, message, status
+
+        return cleaned_display_str, None, None
+
+    def update_postfixes(self, postfixes_str: str) -> tuple[str, str | None, str | None]:
+        """
+        Обрабатывает строку с постфиксами, обновляет конфигурацию и список файлов.
+        Возвращает (очищенная_строка, сообщение_для_ui, статус).
+        """
+        raw_parts = re.split(r"[\s,]+", postfixes_str)
+        cleaned_postfixes = [p.strip() for p in raw_parts if p.strip()]
+        cleaned_display_str = ", ".join(cleaned_postfixes)
+
+        if set(cleaned_postfixes) != set(self.postfixes):
+            self.postfixes = cleaned_postfixes
+            save_config(
+                self.directory_to_scan,
+                self.file_extensions,
+                self.recursive_scan,
+                self.toplevel_dirs_only,
+                self.prefixes,
+                self.postfixes,
+                self.not_prefix,
+                self.not_postfix,
+                CONFIG_FILE,
+            )
+            self.last_selected_file = None
+            message, status = self.refresh_file_list()
+            return cleaned_display_str, message, status
+
+        return cleaned_display_str, None, None
+
+    def set_not_prefix(self, value: bool) -> tuple[str, str] | None:
+        """Обновляет настройку инверсии префикса и обновляет список файлов."""
+        if value != self.not_prefix:
+            self.not_prefix = value
+            self.last_selected_file = None
+            save_config(
+                self.directory_to_scan,
+                self.file_extensions,
+                self.recursive_scan,
+                self.toplevel_dirs_only,
+                self.prefixes,
+                self.postfixes,
+                self.not_prefix,
+                self.not_postfix,
+                CONFIG_FILE,
+            )
+            return self.refresh_file_list()
+        return None
+
+    def set_not_postfix(self, value: bool) -> tuple[str, str] | None:
+        """Обновляет настройку инверсии постфикса и обновляет список файлов."""
+        if value != self.not_postfix:
+            self.not_postfix = value
+            self.last_selected_file = None
+            save_config(
+                self.directory_to_scan,
+                self.file_extensions,
+                self.recursive_scan,
+                self.toplevel_dirs_only,
+                self.prefixes,
+                self.postfixes,
+                self.not_prefix,
+                self.not_postfix,
                 CONFIG_FILE,
             )
             return self.refresh_file_list()

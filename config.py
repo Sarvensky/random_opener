@@ -11,7 +11,7 @@ DEFAULT_SCAN_PATH = str(Path.home() / "Videos")
 
 def load_or_create_config(
     config_file: str,
-) -> tuple[str, list[str], bool, bool]:
+) -> tuple[str, list[str], bool, bool, list[str], list[str], bool, bool]:
     """Загружает конфигурацию из .ini файла или создает его с настройками по умолчанию."""
     config = configparser.ConfigParser()
     config_path = Path(config_file)
@@ -23,6 +23,10 @@ def load_or_create_config(
             "extensions": DEFAULT_EXTENSIONS,
             "recursive": "true",
             "toplevel_only": "true",
+            "prefixes": "",
+            "postfixes": "",
+            "not_prefix": "false",
+            "not_postfix": "false",
         }
         with config_path.open("w", encoding="utf-8") as f:
             config.write(f)
@@ -35,8 +39,16 @@ def load_or_create_config(
     )
     recursive = config.getboolean(CONFIG_SECTION, "recursive", fallback=True)
     toplevel_only = config.getboolean(CONFIG_SECTION, "toplevel_only", fallback=True)
-    extensions = [ext.strip() for ext in extensions_str.split(",")]
-    return directory, extensions, recursive, toplevel_only
+    prefixes_str = config.get(CONFIG_SECTION, "prefixes", fallback="")
+    postfixes_str = config.get(CONFIG_SECTION, "postfixes", fallback="")
+    not_prefix = config.getboolean(CONFIG_SECTION, "not_prefix", fallback=False)
+    not_postfix = config.getboolean(CONFIG_SECTION, "not_postfix", fallback=False)
+    
+    extensions = [ext.strip() for ext in extensions_str.split(",") if ext.strip()]
+    prefixes = [p.strip() for p in prefixes_str.split(",") if p.strip()]
+    postfixes = [p.strip() for p in postfixes_str.split(",") if p.strip()]
+    
+    return directory, extensions, recursive, toplevel_only, prefixes, postfixes, not_prefix, not_postfix
 
 
 def save_config(
@@ -44,6 +56,10 @@ def save_config(
     extensions: list[str],
     recursive: bool,
     toplevel_only: bool,
+    prefixes: list[str],
+    postfixes: list[str],
+    not_prefix: bool,
+    not_postfix: bool,
     config_file: str,
 ):
     """Сохраняет конфигурацию в .ini файл."""
@@ -59,6 +75,10 @@ def save_config(
     config.set(CONFIG_SECTION, "extensions", ", ".join(extensions))
     config.set(CONFIG_SECTION, "recursive", str(recursive))
     config.set(CONFIG_SECTION, "toplevel_only", str(toplevel_only))
+    config.set(CONFIG_SECTION, "prefixes", ", ".join(prefixes))
+    config.set(CONFIG_SECTION, "postfixes", ", ".join(postfixes))
+    config.set(CONFIG_SECTION, "not_prefix", str(not_prefix))
+    config.set(CONFIG_SECTION, "not_postfix", str(not_postfix))
 
     with config_path.open("w", encoding="utf-8") as f:
         config.write(f)
